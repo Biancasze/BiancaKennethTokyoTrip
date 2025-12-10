@@ -45,6 +45,10 @@
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
+    /* 讓備註顯示時支援換行 */
+    .note-multiline {
+      white-space: pre-line;
+    }
   </style>
 </head>
 <body class="min-h-screen flex items-center justify-center">
@@ -176,7 +180,6 @@
               <p class="text-base font-bold text-slate-900 leading-tight">
                 {{ dayHeaderTitle }}
               </p>
-              <!-- 改用 dayNotes，並寫回 Firestore -->
               <input
                 :value="dayNotes[selectedDate] || ''"
                 @input="updateDayDescription($event.target.value)"
@@ -212,7 +215,7 @@
                class="relative flex items-stretch gap-3 rounded-3xl bg-white shadow-md px-3 py-3 border border-slate-100">
             <div class="absolute -left-[7px] top-7 w-3 h-3 rounded-full border-2 border-white bg-timeline shadow-sm"></div>
 
-            <!-- 時間方塊 + 類別 pill -->
+            <!-- 時間方塊 -->
             <div class="w-22 flex flex-col items-center gap-2">
               <div class="w-20 text-center rounded-2xl bg-white border border-slate-200 px-3 py-2 flex flex-col items-center justify-center shadow-sm">
                 <p class="text-[11px] text-slate-400 mb-1 font-medium">
@@ -221,19 +224,6 @@
                 <p class="text-2xl font-semibold text-slate-900 leading-tight tracking-wide font-[Poppins]">
                   {{ formattedTime(item.time) }}
                 </p>
-              </div>
-
-              <div class="w-20">
-                <select
-                  v-model="item.category"
-                  @change="updateScheduleCategory(item.id, item.category)"
-                  class="w-full text-[11px] px-2 py-1.5 rounded-2xl border border-slate-200 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary/40 appearance-none"
-                >
-                  <option value="">未分類</option>
-                  <option value="transport">🚄 交通</option>
-                  <option value="sightseeing">⛩️ 景點</option>
-                  <option value="food">🍢 美食</option>
-                </select>
               </div>
             </div>
 
@@ -252,13 +242,27 @@
                     class="mt-[3px] inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-noteOrange text-[9px] text-noteOrange font-semibold leading-none">
                     i
                   </span>
-                  <p class="text-[11px] text-noteOrange leading-snug line-clamp-2">
+                  <!-- 顯示時支援換行 -->
+                  <p class="text-[11px] text-noteOrange leading-snug note-multiline">
                     {{ item.note }}
                   </p>
                 </div>
 
-                <div v-if="item.mapUrl" class="mt-2">
+                <!-- 分類 + 地圖 同一行 -->
+                <div class="mt-2 flex items-center gap-2">
+                  <select
+                    v-model="item.category"
+                    @change.stop="updateScheduleCategory(item.id, item.category)"
+                    class="text-[11px] px-2 py-1.5 rounded-2xl border border-slate-200 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-primary/40 appearance-none"
+                  >
+                    <option value="">未分類</option>
+                    <option value="transport">🚄 交通</option>
+                    <option value="sightseeing">⛩️ 景點</option>
+                    <option value="food">🍢 美食</option>
+                  </select>
+
                   <button
+                    v-if="item.mapUrl"
                     class="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded-full bg-primary/5 text-primary border border-primary/20 font-medium"
                     @click.stop="openMapUrl(item.mapUrl)">
                     地圖
@@ -487,9 +491,10 @@
 
           <div>
             <p class="text-[11px] text-slate-500 mb-1">備註</p>
-            <textarea v-model="editingSchedule.note" rows="2"
+            <!-- 這裡本來就是 textarea，保留 -->
+            <textarea v-model="editingSchedule.note" rows="3"
                       class="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/40"
-                      placeholder="航班編號、交通方式等等"></textarea>
+                      placeholder="航班編號、交通方式等等（可換行）"></textarea>
           </div>
 
           <div>
@@ -578,7 +583,6 @@
             '2026-01-02': { icon: '🌤️', location: '東京', tempHigh: '8°', tempLow: '3°' },
             '2026-01-03': { icon: '☁️', location: '東京', tempHigh: '8°', tempLow: '3°' }
           },
-          // 每日描述（Firestore 會填入）
           dayNotes: {},
           selectedDate: '2025-12-28',
           expenseSelectedDate: '',
@@ -681,7 +685,6 @@
             this.todos = list;
           });
 
-        // 監聽每日描述 dayNotes
         dayNotesColRef
           .onSnapshot(snapshot => {
             const map = {};
@@ -704,18 +707,15 @@
           return '晚上';
         },
 
-        // 更新每日描述並寫入 Firestore
         async updateDayDescription(text) {
           const dateKey = this.selectedDate;
           if (!dateKey) return;
 
-          // 先更新前端
           this.dayNotes = {
             ...this.dayNotes,
             [dateKey]: text
           };
 
-          // 寫入 /dayNotes/{dateKey}
           await dayNotesColRef.doc(dateKey).set(
             {
               dateKey,
